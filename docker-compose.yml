@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # NFS Server container
   nfs-server:
@@ -186,7 +184,6 @@ services:
       sqlite-runner:
         condition: service_started
     volumes:
-      - ./src:/app/src:ro
       - ./sql:/app/sql:ro
       - ./config:/app/config:ro
       - ./results:/app/results
@@ -226,4 +223,4 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.20.0.0/16
+        - subnet: 192.168.200.0/24
