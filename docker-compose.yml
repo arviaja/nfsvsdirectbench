@@ -70,13 +70,24 @@ services:
     networks:
       - nfsbench-network
     entrypoint: |
-      sh -c "
+      sh -c '
+        echo "1. Installing NFS utils..." &&
         apk add --no-cache nfs-utils &&
+        echo "2. Creating directory..." &&
         mkdir -p /mnt/nfs/postgresql &&
+        echo "3. Mounting NFS..." &&
         /mount-nfs.sh nfs-server /nfsshare /mnt/nfs v3 &&
+        echo "4. Checking mount..." &&
+        ls -la /mnt/nfs/ &&
+        echo "4.1. Creating postgresql directory in NFS mount..." &&
+        mkdir -p /mnt/nfs/postgresql &&
+        echo "4.2. Verifying postgresql directory..." &&
+        ls -la /mnt/nfs/postgresql &&
+        echo "5. Changing ownership..." &&
         chown -R postgres:postgres /mnt/nfs/postgresql &&
+        echo "6. Ownership changed, starting PostgreSQL..." &&
         exec docker-entrypoint.sh postgres
-      "
+      '
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U benchmark_user -d benchmark_db"]
       interval: 15s
@@ -128,15 +139,24 @@ services:
     networks:
       - nfsbench-network
     entrypoint: |
-      sh -c "
-        apt-get update && apt-get install -y nfs-common &&
+      sh -c '
+        echo "1. Installing NFS common..." &&
+        microdnf install -y nfs-utils &&
+        echo "2. Creating directory..." &&
         mkdir -p /mnt/nfs/mysql &&
+        echo "3. Mounting NFS..." &&
         /mount-nfs.sh nfs-server /nfsshare /mnt/nfs v3 &&
-        mkdir -p /mnt/nfs/mysql/data &&
+        echo "4. Checking mount..." &&
+        ls -la /mnt/nfs/ &&
+        echo "4.1. Creating mysql directory in NFS mount..." &&
+        mkdir -p /mnt/nfs/mysql &&
+        echo "4.2. Verifying mysql directory..." &&
+        ls -la /mnt/nfs/mysql &&
+        echo "5. Changing ownership..." &&
         chown -R mysql:mysql /mnt/nfs/mysql &&
-        export MYSQL_DATADIR=/mnt/nfs/mysql/data &&
-        exec docker-entrypoint.sh mysqld --datadir=/mnt/nfs/mysql/data
-      "
+        echo "6. Ownership changed, starting MySQL..." &&
+        exec docker-entrypoint.sh mysqld --datadir=/mnt/nfs/mysql
+      '
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "benchmark_user", "-pbenchmark_pass"]
       interval: 15s
@@ -151,6 +171,7 @@ services:
     container_name: nfsbench-sqlite-runner
     restart: unless-stopped
     privileged: true
+    user: root
     depends_on:
       nfs-server:
         condition: service_healthy
@@ -161,13 +182,17 @@ services:
     networks:
       - nfsbench-network
     entrypoint: |
-      sh -c "
-        apk add --no-cache nfs-utils &&
-        mkdir -p /data/nfs &&
-        /mount-nfs.sh nfs-server /nfsshare /data/nfs v3 &&
-        mkdir -p /data/nfs/sqlite &&
-        tail -f /dev/null
-      "
+      sh -c '
+        echo "1. NFS utils already installed, skipping..." &&
+        echo "2. Creating directory..." &&
+        mkdir -p /mnt/nfs/sqlite &&
+        echo "3. Mounting NFS..." &&
+        /mount-nfs.sh nfs-server /nfsshare /mnt/nfs v3 &&
+        echo "4. Checking mount..." &&
+        ls -la /mnt/nfs/ &&
+        echo "5. SQLite setup complete, keeping container alive..." &&
+        sleep infinity
+      '
 
   # Benchmark orchestrator
   benchmark-runner:
@@ -211,7 +236,8 @@ services:
       - MYSQL_USER=benchmark_user
       - MYSQL_PASSWORD=benchmark_pass
       - MYSQL_DB=benchmark_db
-    command: ["nfsbench", "--help"]
+    entrypoint: ["/bin/sh"]
+    command: ["-c", "while true; do sleep 30; done"]
 
 volumes:
   nfs-data:

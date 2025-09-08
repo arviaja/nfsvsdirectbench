@@ -65,7 +65,7 @@ scenarios:
   - name: "heavy_inserts"
     description: "High-volume INSERT operations"
     enabled: true
-    duration: 300  # seconds
+    duration: 10  # seconds (reduced for testing)
     parameters:
       threads: 10
       batch_size: 1000

@@ -8,7 +8,7 @@ NFS_SERVER="$1"
 REMOTE_PATH="$2"
 LOCAL_MOUNT="$3"
 NFS_VERSION="${4:-v4}"
-MOUNT_OPTIONS="${5:-rw,hard,intr,rsize=8192,wsize=8192,timeo=14}"
+MOUNT_OPTIONS="${5:-rw,hard,rsize=8192,wsize=8192,timeo=14}"
 
 if [ -z "$NFS_SERVER" ] || [ -z "$REMOTE_PATH" ] || [ -z "$LOCAL_MOUNT" ]; then
     echo "Usage: $0 <nfs_server> <remote_path> <local_mount> [nfs_version] [mount_options]"
@@ -64,6 +64,3 @@ if ! mountpoint -q "$LOCAL_MOUNT"; then
 fi
 
 echo "Successfully mounted ${NFS_SERVER}:${REMOTE_PATH} at ${LOCAL_MOUNT}"
-
-# Display mount information
-mount | grep "$LOCAL_MOUNT"
