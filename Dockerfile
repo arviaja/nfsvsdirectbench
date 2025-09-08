@@ -1,0 +1,65 @@
+# Multi-stage build for Go application
+FROM --platform=$BUILDPLATFORM golang:1.21-alpine AS builder
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates tzdata
+
+WORKDIR /src
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -ldflags="-w -s" -o /app/nfsbench cmd/nfsbench/main.go
+
+# Final stage
+FROM alpine:3.18
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    postgresql-client \
+    mysql-client \
+    sqlite \
+    curl \
+    bash \
+    nfs-utils \
+    ca-certificates
+
+# Create app user
+RUN adduser -D -s /bin/sh appuser
+
+# Copy binary from builder
+COPY --from=builder /app/nfsbench /usr/local/bin/nfsbench
+
+# Copy configuration and scripts
+COPY config/ /app/config/
+COPY sql/ /app/sql/
+COPY scripts/ /app/scripts/
+
+# Set permissions
+RUN chmod +x /app/scripts/*.sh && \
+    chown -R appuser:appuser /app
+
+# Create directories
+RUN mkdir -p /app/results && \
+    chown -R appuser:appuser /app/results
+
+USER appuser
+WORKDIR /app
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD nfsbench --help > /dev/null || exit 1
+
+ENTRYPOINT ["nfsbench"]
+CMD ["--help"]

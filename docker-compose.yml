@@ -209,7 +209,7 @@ services:
       - MYSQL_USER=benchmark_user
       - MYSQL_PASSWORD=benchmark_pass
       - MYSQL_DB=benchmark_db
-    command: ["tail", "-f", "/dev/null"]
+    command: ["nfsbench", "--help"]
 
 volumes:
   nfs-data:

@@ -29,7 +29,7 @@ help: ## Show this help message
 # Project Setup
 # ============================================================================
 
-setup: setup-dirs setup-venv build ## Initial project setup
+setup: setup-dirs setup-go build ## Initial project setup
 	@echo "✓ Project setup complete"
 	@echo ""
 	@echo "Next steps:"
@@ -44,11 +44,10 @@ setup-dirs: ## Create necessary directories
 	@mkdir -p config
 	@mkdir -p docs
 
-setup-venv: ## Set up Python virtual environment
-	@echo "Setting up Python virtual environment..."
-	@python3 -m venv $(VENV_DIR)
-	@$(VENV_DIR)/bin/pip install --upgrade pip
-	@$(VENV_DIR)/bin/pip install -r requirements.txt
+setup-go: ## Set up Go environment
+	@echo "Setting up Go environment..."
+	@go mod download
+	@go mod tidy
 
 # ============================================================================
 # Docker Management
@@ -93,30 +92,30 @@ logs-mysql: ## Show MySQL logs
 
 benchmark: start ## Run full benchmark suite
 	@echo "Running full benchmark suite..."
-	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner python -m src.benchmark run
+	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner nfsbench run
 
 benchmark-quick: start ## Run quick benchmark (reduced duration)
 	@echo "Running quick benchmark suite..."
-	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner python -m src.benchmark run --config config/quick.yaml
+	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner nfsbench run --config config/quick.yaml
 
 benchmark-postgresql: start ## Run benchmark for PostgreSQL only
 	@echo "Running PostgreSQL benchmark..."
-	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner python -m src.benchmark run -d postgresql
+	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner nfsbench run -d postgresql
 
 benchmark-mysql: start ## Run benchmark for MySQL only
 	@echo "Running MySQL benchmark..."
-	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner python -m src.benchmark run -d mysql
+	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner nfsbench run -d mysql
 
 benchmark-sqlite: start ## Run benchmark for SQLite only
 	@echo "Running SQLite benchmark..."
-	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner python -m src.benchmark run -d sqlite
+	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner nfsbench run -d sqlite
 
 benchmark-custom: start ## Run benchmark with custom config (make benchmark-custom CONFIG=myconfig.yaml)
 	@echo "Running benchmark with custom configuration: $(CONFIG)"
-	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner python -m src.benchmark run --config $(CONFIG)
+	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner nfsbench run --config $(CONFIG)
 
 benchmark-dry-run: ## Show what benchmark would run without executing
-	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner python -m src.benchmark run --dry-run
+	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner nfsbench run --dry-run
 
 # ============================================================================
 # Reporting
@@ -154,22 +153,20 @@ shell-mysql: ## Open mysql shell to MySQL (direct storage)
 
 lint: ## Run code linting
 	@echo "Running code linting..."
-	@$(VENV_DIR)/bin/python -m flake8 src/
-	@$(VENV_DIR)/bin/python -m black --check src/
-	@$(VENV_DIR)/bin/python -m isort --check-only src/
+	@go vet ./...
+	@go fmt ./...
 
 format: ## Format code
 	@echo "Formatting code..."
-	@$(VENV_DIR)/bin/python -m black src/
-	@$(VENV_DIR)/bin/python -m isort src/
+	@go fmt ./...
 
 test: ## Run unit tests
 	@echo "Running unit tests..."
-	@$(VENV_DIR)/bin/python -m pytest tests/ -v
+	@go test ./... -v
 
 test-integration: start ## Run integration tests
 	@echo "Running integration tests..."
-	@$(VENV_DIR)/bin/python -m pytest tests/integration/ -v
+	@go test ./... -tags=integration -v
 
 # ============================================================================
 # Cleanup
