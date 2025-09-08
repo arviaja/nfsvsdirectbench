@@ -1,0 +1,229 @@
+version: '3.8'
+
+services:
+  # NFS Server container
+  nfs-server:
+    image: itsthenetwork/nfs-server-alpine:latest
+    container_name: nfsbench-nfs-server
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - SHARED_DIRECTORY=/nfsshare
+    volumes:
+      - nfs-data:/nfsshare
+      - ./scripts/nfs-exports:/etc/exports:ro
+    ports:
+      - "2049:2049"
+    networks:
+      - nfsbench-network
+    healthcheck:
+      test: ["CMD", "showmount", "-e", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL with direct storage
+  postgresql-direct:
+    image: postgres:15-alpine
+    container_name: nfsbench-postgres-direct
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: benchmark_db
+      POSTGRES_USER: benchmark_user
+      POSTGRES_PASSWORD: benchmark_pass
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - postgres-direct-data:/var/lib/postgresql/data
+      - ./sql/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - nfsbench-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U benchmark_user -d benchmark_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL with NFS storage
+  postgresql-nfs:
+    image: postgres:15-alpine
+    container_name: nfsbench-postgres-nfs
+    restart: unless-stopped
+    privileged: true
+    depends_on:
+      nfs-server:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: benchmark_db
+      POSTGRES_USER: benchmark_user
+      POSTGRES_PASSWORD: benchmark_pass
+      PGDATA: /mnt/nfs/postgresql/data
+    volumes:
+      - ./sql/init:/docker-entrypoint-initdb.d:ro
+      - ./scripts/mount-nfs.sh:/mount-nfs.sh:ro
+    ports:
+      - "5433:5432"
+    networks:
+      - nfsbench-network
+    entrypoint: |
+      sh -c "
+        apk add --no-cache nfs-utils &&
+        mkdir -p /mnt/nfs/postgresql &&
+        /mount-nfs.sh nfs-server /nfsshare /mnt/nfs v4 &&
+        chown -R postgres:postgres /mnt/nfs/postgresql &&
+        exec docker-entrypoint.sh postgres
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U benchmark_user -d benchmark_db"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # MySQL with direct storage
+  mysql-direct:
+    image: mysql:8.0
+    container_name: nfsbench-mysql-direct
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: benchmark_db
+      MYSQL_USER: benchmark_user
+      MYSQL_PASSWORD: benchmark_pass
+    volumes:
+      - mysql-direct-data:/var/lib/mysql
+      - ./sql/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3306:3306"
+    networks:
+      - nfsbench-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "benchmark_user", "-pbenchmark_pass"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MySQL with NFS storage
+  mysql-nfs:
+    image: mysql:8.0
+    container_name: nfsbench-mysql-nfs
+    restart: unless-stopped
+    privileged: true
+    depends_on:
+      nfs-server:
+        condition: service_healthy
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: benchmark_db
+      MYSQL_USER: benchmark_user
+      MYSQL_PASSWORD: benchmark_pass
+    volumes:
+      - ./sql/init:/docker-entrypoint-initdb.d:ro
+      - ./scripts/mount-nfs.sh:/mount-nfs.sh:ro
+    ports:
+      - "3307:3306"
+    networks:
+      - nfsbench-network
+    entrypoint: |
+      sh -c "
+        apt-get update && apt-get install -y nfs-common &&
+        mkdir -p /mnt/nfs/mysql &&
+        /mount-nfs.sh nfs-server /nfsshare /mnt/nfs v4 &&
+        mkdir -p /mnt/nfs/mysql/data &&
+        chown -R mysql:mysql /mnt/nfs/mysql &&
+        export MYSQL_DATADIR=/mnt/nfs/mysql/data &&
+        exec docker-entrypoint.sh mysqld --datadir=/mnt/nfs/mysql/data
+      "
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "benchmark_user", "-pbenchmark_pass"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # SQLite benchmark runner container
+  sqlite-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.sqlite
+    container_name: nfsbench-sqlite-runner
+    restart: unless-stopped
+    privileged: true
+    depends_on:
+      nfs-server:
+        condition: service_healthy
+    volumes:
+      - sqlite-direct-data:/data/direct
+      - ./scripts/mount-nfs.sh:/mount-nfs.sh:ro
+      - ./sql/init:/sql/init:ro
+    networks:
+      - nfsbench-network
+    entrypoint: |
+      sh -c "
+        apk add --no-cache nfs-utils &&
+        mkdir -p /data/nfs &&
+        /mount-nfs.sh nfs-server /nfsshare /data/nfs v4 &&
+        mkdir -p /data/nfs/sqlite &&
+        tail -f /dev/null
+      "
+
+  # Benchmark orchestrator
+  benchmark-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.benchmark
+    container_name: nfsbench-runner
+    restart: unless-stopped
+    privileged: true
+    depends_on:
+      postgresql-direct:
+        condition: service_healthy
+      postgresql-nfs:
+        condition: service_healthy
+      mysql-direct:
+        condition: service_healthy
+      mysql-nfs:
+        condition: service_healthy
+      sqlite-runner:
+        condition: service_started
+    volumes:
+      - ./src:/app/src:ro
+      - ./sql:/app/sql:ro
+      - ./config:/app/config:ro
+      - ./results:/app/results
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    working_dir: /app
+    networks:
+      - nfsbench-network
+    environment:
+      - POSTGRES_DIRECT_HOST=postgresql-direct
+      - POSTGRES_DIRECT_PORT=5432
+      - POSTGRES_NFS_HOST=postgresql-nfs
+      - POSTGRES_NFS_PORT=5432
+      - MYSQL_DIRECT_HOST=mysql-direct
+      - MYSQL_DIRECT_PORT=3306
+      - MYSQL_NFS_HOST=mysql-nfs
+      - MYSQL_NFS_PORT=3306
+      - POSTGRES_USER=benchmark_user
+      - POSTGRES_PASSWORD=benchmark_pass
+      - POSTGRES_DB=benchmark_db
+      - MYSQL_USER=benchmark_user
+      - MYSQL_PASSWORD=benchmark_pass
+      - MYSQL_DB=benchmark_db
+    command: ["tail", "-f", "/dev/null"]
+
+volumes:
+  nfs-data:
+    driver: local
+  postgres-direct-data:
+    driver: local
+  mysql-direct-data:
+    driver: local
+  sqlite-direct-data:
+    driver: local
+
+networks:
+  nfsbench-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

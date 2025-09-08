@@ -1,0 +1,170 @@
+---
+# Default NFS vs Direct Storage Benchmark Configuration
+
+# Global settings
+global:
+  output_dir: "./results"
+  timestamp_format: "%Y%m%d_%H%M%S"
+  log_level: "INFO"
+  max_workers: 4
+
+# Database configurations
+databases:
+  postgresql:
+    enabled: true
+    direct:
+      host: "postgresql-direct"
+      port: 5432
+      database: "benchmark_db"
+      username: "benchmark_user"
+      password: "benchmark_pass"
+    nfs:
+      host: "postgresql-nfs"
+      port: 5432
+      database: "benchmark_db"
+      username: "benchmark_user"
+      password: "benchmark_pass"
+  
+  mysql:
+    enabled: true
+    direct:
+      host: "mysql-direct"
+      port: 3306
+      database: "benchmark_db"
+      username: "benchmark_user"
+      password: "benchmark_pass"
+    nfs:
+      host: "mysql-nfs"
+      port: 3306
+      database: "benchmark_db"
+      username: "benchmark_user"
+      password: "benchmark_pass"
+  
+  sqlite:
+    enabled: true
+    direct:
+      path: "/data/direct/benchmark.db"
+    nfs:
+      path: "/data/nfs/sqlite/benchmark.db"
+
+# NFS test configurations
+nfs:
+  versions:
+    - "v3"
+    - "v4"
+  mount_options:
+    - name: "default"
+      options: "rw,hard,intr,rsize=8192,wsize=8192,timeo=14"
+    - name: "high_performance"
+      options: "rw,hard,intr,rsize=65536,wsize=65536,timeo=14,noatime"
+    - name: "sync_mode"
+      options: "rw,sync,hard,intr,rsize=8192,wsize=8192,timeo=14"
+
+# Benchmark scenarios
+scenarios:
+  - name: "heavy_inserts"
+    description: "High-volume INSERT operations"
+    enabled: true
+    duration: 300  # seconds
+    parameters:
+      threads: 10
+      batch_size: 1000
+      record_size: "medium"  # small, medium, large
+      
+  - name: "mixed_workload_70_30"
+    description: "Mixed read/write workload (70% read, 30% write)"
+    enabled: true
+    duration: 600
+    parameters:
+      threads: 8
+      read_ratio: 70
+      write_ratio: 30
+      query_complexity: "medium"
+      
+  - name: "mixed_workload_50_50"
+    description: "Balanced read/write workload"
+    enabled: true
+    duration: 600
+    parameters:
+      threads: 8
+      read_ratio: 50
+      write_ratio: 50
+      query_complexity: "medium"
+      
+  - name: "transaction_heavy"
+    description: "High-concurrency transaction processing"
+    enabled: true
+    duration: 450
+    parameters:
+      threads: 12
+      transactions_per_thread: 1000
+      isolation_level: "READ_COMMITTED"
+      
+  - name: "bulk_import"
+    description: "Large dataset bulk import operations"
+    enabled: true
+    duration: 900
+    parameters:
+      batch_size: 10000
+      total_records: 1000000
+      use_copy: true  # Use COPY/LOAD DATA vs INSERT
+      
+  - name: "oltp_benchmark"
+    description: "OLTP workload simulation (TPC-C-like)"
+    enabled: false  # Optional, more complex scenario
+    duration: 1200
+    parameters:
+      warehouses: 10
+      threads: 16
+      ramp_up_time: 60
+
+# Metrics collection
+metrics:
+  collection_interval: 5  # seconds
+  system_metrics:
+    cpu: true
+    memory: true
+    disk_io: true
+    network_io: true
+  database_metrics:
+    connections: true
+    query_stats: true
+    lock_stats: true
+    buffer_stats: true
+  latency_percentiles: [50, 90, 95, 99, 99.9]
+
+# Reporting
+reporting:
+  formats:
+    - "cli"
+    - "json"
+    - "csv"
+    - "html"
+    - "markdown"
+  
+  cli:
+    real_time_updates: true
+    show_progress_bars: true
+    
+  html:
+    include_charts: true
+    interactive: true
+    template: "dashboard"
+    
+  comparison:
+    statistical_analysis: true
+    significance_threshold: 0.05
+    minimum_samples: 100
+
+# Test execution
+execution:
+  warmup_duration: 30  # seconds
+  cooldown_duration: 10  # seconds
+  repeat_count: 3  # Run each scenario this many times
+  randomize_order: false
+  fail_fast: false  # Continue on individual test failures
+  
+  cleanup:
+    reset_databases: true
+    clear_caches: true
+    restart_services: false
