@@ -43,7 +43,7 @@ fi
 # Mount with specified version and options
 case "$NFS_VERSION" in
     "v3")
-        MOUNT_CMD="mount -t nfs -o nfsvers=3,${MOUNT_OPTIONS} ${NFS_SERVER}:${REMOTE_PATH} ${LOCAL_MOUNT}"
+        MOUNT_CMD="mount -t nfs -o nfsvers=3,nolock,${MOUNT_OPTIONS} ${NFS_SERVER}:${REMOTE_PATH} ${LOCAL_MOUNT}"
         ;;
     "v4")
         MOUNT_CMD="mount -t nfs -o nfsvers=4,${MOUNT_OPTIONS} ${NFS_SERVER}:${REMOTE_PATH} ${LOCAL_MOUNT}"

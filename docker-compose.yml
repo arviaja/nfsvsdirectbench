@@ -1,24 +1,29 @@
 services:
   # NFS Server container
   nfs-server:
-    image: itsthenetwork/nfs-server-alpine:latest
+    image: obeoneorg/nfs-server:latest
     container_name: nfsbench-nfs-server
     privileged: true
     restart: unless-stopped
     environment:
-      - SHARED_DIRECTORY=/nfsshare
+      - NFS_EXPORT_1=/nfsshare *(rw,sync,no_subtree_check,no_root_squash,insecure)
     volumes:
       - nfs-data:/nfsshare
-      - ./scripts/nfs-exports:/etc/exports:ro
     ports:
       - "2049:2049"
+      - "2049:2049/udp"
+      - "32111:111"
+      - "32111:111/udp"
+      - "32765:32765"
+      - "32766:32766"
+      - "32767:32767"
     networks:
       - nfsbench-network
     healthcheck:
       test: ["CMD", "showmount", "-e", "localhost"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
 
   # PostgreSQL with direct storage
   postgresql-direct:
@@ -68,7 +73,7 @@ services:
       sh -c "
         apk add --no-cache nfs-utils &&
         mkdir -p /mnt/nfs/postgresql &&
-        /mount-nfs.sh nfs-server /nfsshare /mnt/nfs v4 &&
+        /mount-nfs.sh nfs-server /nfsshare /mnt/nfs v3 &&
         chown -R postgres:postgres /mnt/nfs/postgresql &&
         exec docker-entrypoint.sh postgres
       "
@@ -126,7 +131,7 @@ services:
       sh -c "
         apt-get update && apt-get install -y nfs-common &&
         mkdir -p /mnt/nfs/mysql &&
-        /mount-nfs.sh nfs-server /nfsshare /mnt/nfs v4 &&
+        /mount-nfs.sh nfs-server /nfsshare /mnt/nfs v3 &&
         mkdir -p /mnt/nfs/mysql/data &&
         chown -R mysql:mysql /mnt/nfs/mysql &&
         export MYSQL_DATADIR=/mnt/nfs/mysql/data &&
@@ -159,7 +164,7 @@ services:
       sh -c "
         apk add --no-cache nfs-utils &&
         mkdir -p /data/nfs &&
-        /mount-nfs.sh nfs-server /nfsshare /data/nfs v4 &&
+        /mount-nfs.sh nfs-server /nfsshare /data/nfs v3 &&
         mkdir -p /data/nfs/sqlite &&
         tail -f /dev/null
       "
