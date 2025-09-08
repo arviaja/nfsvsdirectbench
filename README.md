@@ -46,7 +46,7 @@ This project provides empirical evidence of NFS overhead in database workloads, 
 
 ### Prerequisites
 - Docker and Docker Compose
-- Python 3.8+
+- Go 1.21+ (for building from source)
 - 4GB+ available RAM
 - 10GB+ available disk space
 
@@ -61,14 +61,17 @@ make setup
 ### Basic Usage
 
 ```bash
+# Build the benchmark binary
+make build
+
 # Run full benchmark suite (all databases, all scenarios)
+./bin/nfsvsdirectbench --config config/default.yaml
+
+# Run with Docker (recommended)
 make benchmark
 
-# Run specific database benchmark
-make benchmark-postgresql
-
-# Run with custom configuration
-python -m src.benchmark --config custom-config.yaml
+# Run specific test scenarios
+./bin/nfsvsdirectbench --config config/postgresql-only.yaml
 
 # Generate reports from existing results
 make reports
