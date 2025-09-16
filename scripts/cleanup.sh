@@ -40,7 +40,7 @@ main() {
     
     # Show current services
     print_status "Current benchmark services:"
-    if docker-compose ps | grep -q "nfsbench"; then
+    if docker-compose ps -q | grep -q .; then
         docker-compose ps
         echo ""
     else
@@ -64,7 +64,7 @@ main() {
     
     # Show final status
     print_status "Final status check:"
-    if docker-compose ps | grep -q "nfsbench"; then
+    if docker-compose ps -q | grep -q .; then
         print_warning "Some services may still be stopping..."
         docker-compose ps
     else

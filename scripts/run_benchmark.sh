@@ -62,12 +62,53 @@ Available scenarios: heavy_inserts, mixed_workload_70_30, mixed_workload_50_50, 
 EOF
 }
 
-# Function to cleanup services
+# Global variable to track the benchmark exit code
+BENCHMARK_EXIT_CODE=0
+
+# Function to cleanup services with timeout and verification
 cleanup_services() {
     print_status "Shutting down benchmark services..."
     
     if docker-compose ps -q | grep -q .; then
-        docker-compose down --remove-orphans
+        # Attempt graceful shutdown first
+        print_status "Attempting graceful shutdown..."
+        
+        local shutdown_success=false
+        if command -v timeout >/dev/null 2>&1; then
+            # Use timeout if available
+            if timeout 60 docker-compose down --remove-orphans; then
+                shutdown_success=true
+            fi
+        elif command -v gtimeout >/dev/null 2>&1; then
+            # Use gtimeout on macOS if coreutils is installed
+            if gtimeout 60 docker-compose down --remove-orphans; then
+                shutdown_success=true
+            fi
+        else
+            # No timeout available, just try normal shutdown
+            if docker-compose down --remove-orphans; then
+                shutdown_success=true
+            fi
+        fi
+        
+        # If graceful shutdown failed, force stop
+        if [ "$shutdown_success" = false ]; then
+            print_warning "Graceful shutdown failed or timed out, forcing container stop..."
+            # Force stop containers if graceful shutdown fails
+            docker-compose kill 2>/dev/null || true
+            docker-compose rm -f 2>/dev/null || true
+            # Clean up network
+            docker network rm nfsvsdirectbench_nfsbench-network 2>/dev/null || true
+        fi
+        
+        # Verify all containers are stopped
+        local remaining=$(docker ps -q --filter name=nfsbench | wc -l | tr -d ' ')
+        if [ "$remaining" -gt 0 ]; then
+            print_warning "Force stopping remaining containers..."
+            docker stop $(docker ps -q --filter name=nfsbench) 2>/dev/null || true
+            docker rm $(docker ps -aq --filter name=nfsbench) 2>/dev/null || true
+        fi
+        
         print_success "All benchmark services stopped"
     else
         print_status "No benchmark services were running"
@@ -78,10 +119,23 @@ cleanup_services() {
     # docker-compose down -v
 }
 
+# Function to handle cleanup on exit while preserving exit code
+cleanup_and_exit() {
+    local exit_code=$?
+    # If benchmark set a specific exit code, use that instead
+    if [ "$BENCHMARK_EXIT_CODE" -ne 0 ]; then
+        exit_code=$BENCHMARK_EXIT_CODE
+    fi
+    
+    print_status "Cleaning up before exit (exit code: $exit_code)..."
+    cleanup_services
+    exit $exit_code
+}
+
 # Function to setup trap for cleanup on exit
 setup_cleanup_trap() {
     if [ "$NO_CLEANUP" = false ]; then
-        trap 'cleanup_services; exit' INT TERM EXIT
+        trap 'cleanup_and_exit' INT TERM EXIT
     fi
 }
 
@@ -162,6 +216,7 @@ run_benchmark() {
     # Run the benchmark
     if eval $cmd; then
         print_success "Benchmark completed successfully!"
+        BENCHMARK_EXIT_CODE=0
         
         # Show results location
         print_status "Results saved to:"
@@ -170,6 +225,7 @@ run_benchmark() {
         return 0
     else
         print_error "Benchmark failed!"
+        BENCHMARK_EXIT_CODE=1
         return 1
     fi
 }
@@ -279,20 +335,20 @@ main() {
     if run_benchmark; then
         show_results
         print_success "Benchmark completed successfully!"
-        exit_code=0
+        BENCHMARK_EXIT_CODE=0
     else
         print_error "Benchmark failed!"
-        exit_code=1
+        BENCHMARK_EXIT_CODE=1
     fi
     
-    # Manual cleanup if trap is disabled
-    if [ "$NO_CLEANUP" = false ]; then
-        cleanup_services
-    else
+    # If cleanup is disabled, disable the trap and warn user
+    if [ "$NO_CLEANUP" = true ]; then
+        trap - INT TERM EXIT  # Remove the cleanup trap
         print_warning "Services left running for debugging (use --cleanup-only to stop them later)"
+        exit $BENCHMARK_EXIT_CODE
     fi
     
-    exit $exit_code
+    # Otherwise, the trap will handle cleanup on normal exit
 }
 
 # Run main function

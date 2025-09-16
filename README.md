@@ -103,12 +103,16 @@ The project includes automated scripts that handle the complete benchmark lifecy
 - 🔒 **Safe operation** - only affects benchmark containers
 - 📊 **Status reporting** before and after cleanup
 
-### Safety Features
-- **Signal Traps**: Automatic cleanup on script interruption
-- **Exit Traps**: Services cleaned up on script completion  
-- **Selective Shutdown**: Only benchmark containers affected
-- **Health Monitoring**: Wait for services to be ready
-- **Error Recovery**: Cleanup even on benchmark failure
+### Enhanced Container Lifecycle Management
+- **Automatic Cleanup**: All containers are automatically stopped when benchmarks complete
+- **Signal Traps**: Graceful cleanup on script interruption (Ctrl+C, SIGTERM)
+- **Exit Code Preservation**: Cleanup doesn't mask benchmark success/failure status
+- **Timeout Protection**: 60-second timeout for graceful shutdown with force-kill fallback
+- **Verification**: Post-cleanup verification ensures all containers are actually stopped
+- **No Restart Policy**: Containers don't persist after cleanup (restart: "no")
+- **Selective Shutdown**: Only affects nfsbench-* containers, leaves other Docker containers alone
+- **Health Monitoring**: Wait for services to be ready before running benchmarks
+- **Error Recovery**: Cleanup guaranteed even if benchmarks fail or are interrupted
 
 ### Results Location
 Benchmark results are automatically saved to:

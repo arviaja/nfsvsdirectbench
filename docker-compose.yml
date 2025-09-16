@@ -4,7 +4,7 @@ services:
     image: obeoneorg/nfs-server:latest
     container_name: nfsbench-nfs-server
     privileged: true
-    restart: unless-stopped
+    restart: "no"
     environment:
       - NFS_EXPORT_1=/nfsshare *(rw,sync,no_subtree_check,no_root_squash,insecure)
     volumes:
@@ -29,7 +29,7 @@ services:
   postgresql-direct:
     image: postgres:15-alpine
     container_name: nfsbench-postgres-direct
-    restart: unless-stopped
+    restart: "no"
     environment:
       POSTGRES_DB: benchmark_db
       POSTGRES_USER: benchmark_user
@@ -52,7 +52,7 @@ services:
   postgresql-nfs:
     image: postgres:15-alpine
     container_name: nfsbench-postgres-nfs
-    restart: unless-stopped
+    restart: "no"
     privileged: true
     depends_on:
       nfs-server:
@@ -98,7 +98,7 @@ services:
   mysql-direct:
     image: mysql:8.0
     container_name: nfsbench-mysql-direct
-    restart: unless-stopped
+    restart: "no"
     environment:
       MYSQL_ROOT_PASSWORD: root_password
       MYSQL_DATABASE: benchmark_db
@@ -121,7 +121,7 @@ services:
   mysql-nfs:
     image: mysql:8.0
     container_name: nfsbench-mysql-nfs
-    restart: unless-stopped
+    restart: "no"
     privileged: true
     depends_on:
       nfs-server:
@@ -169,7 +169,7 @@ services:
       context: .
       dockerfile: Dockerfile.sqlite
     container_name: nfsbench-sqlite-runner
-    restart: unless-stopped
+    restart: "no"
     privileged: true
     user: root
     depends_on:
@@ -200,7 +200,7 @@ services:
       context: .
       dockerfile: Dockerfile.benchmark
     container_name: nfsbench-runner
-    restart: unless-stopped
+    restart: "no"
     privileged: true
     depends_on:
       postgresql-direct:
