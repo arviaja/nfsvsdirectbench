@@ -1,0 +1,122 @@
+---
+# Quick NFS vs Direct Storage Benchmark Configuration
+# Reduced durations for quick testing
+
+# Global settings
+global:
+  output_dir: "./results"
+  timestamp_format: "20060102_150405"
+  log_level: "INFO"
+  max_workers: 4
+
+# Database configurations
+databases:
+  postgresql:
+    enabled: true
+    direct:
+      host: "postgresql-direct"
+      port: 5432
+      database: "benchmark_db"
+      username: "benchmark_user"
+      password: "benchmark_pass"
+    nfs:
+      host: "postgresql-nfs"
+      port: 5432
+      database: "benchmark_db"
+      username: "benchmark_user"
+      password: "benchmark_pass"
+  
+  mysql:
+    enabled: false  # Disable for quick test
+  
+  sqlite:
+    enabled: false  # Disable for quick test
+
+# NFS test configurations
+nfs:
+  versions:
+    - "v3"  # Only test v3 for quick run
+  mount_options:
+    - name: "default"
+      options: "rw,hard,intr,rsize=8192,wsize=8192,timeo=14"
+
+# Benchmark scenarios - much shorter durations
+scenarios:
+  - name: "heavy_inserts"
+    description: "High-volume INSERT operations"
+    enabled: true
+    duration: 30  # reduced from 10
+    parameters:
+      threads: 5  # reduced threads
+      batch_size: 500  # reduced batch size
+      record_size: "small"  # smaller records
+      
+  - name: "mixed_workload_70_30"
+    description: "Mixed read/write workload (70% read, 30% write)"
+    enabled: false  # Disable for quick test
+    
+  - name: "mixed_workload_50_50"
+    description: "Balanced read/write workload"
+    enabled: false  # Disable for quick test
+    
+  - name: "transaction_heavy"
+    description: "High-concurrency transaction processing"
+    enabled: false  # Disable for quick test
+    
+  - name: "bulk_import"
+    description: "Large dataset bulk import operations"
+    enabled: false  # Disable for quick test
+    
+  - name: "oltp_benchmark"
+    description: "OLTP workload simulation (TPC-C-like)"
+    enabled: false  # Disable for quick test
+
+# Metrics collection
+metrics:
+  collection_interval: 5  # seconds
+  system_metrics:
+    cpu: true
+    memory: true
+    disk_io: true
+    network_io: true
+  database_metrics:
+    connections: true
+    query_stats: true
+    lock_stats: true
+    buffer_stats: true
+  latency_percentiles: [50, 90, 95, 99]
+
+# Reporting
+reporting:
+  formats:
+    - "cli"
+    - "json"
+    - "csv"
+    - "html"
+  
+  cli:
+    real_time_updates: true
+    show_progress_bars: true
+    
+  html:
+    include_charts: true
+    interactive: true
+    template: "dashboard"
+    
+  comparison:
+    statistical_analysis: true
+    significance_threshold: 0.05
+    minimum_samples: 50  # reduced from 100
+
+# Test execution
+execution:
+  warmup_duration: 15  # reduced from 30 seconds
+  cooldown_duration: 5   # reduced from 10 seconds
+  repeat_count: 1        # reduced from 3
+  randomize_order: false
+  fail_fast: false
+  
+  cleanup:
+    reset_databases: true
+    clear_caches: true
+    restart_services: false

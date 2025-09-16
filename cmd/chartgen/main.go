@@ -82,10 +82,10 @@ func main() {
 		// Try to find latest results file
 		latest, err := findLatestResults()
 		if err != nil {
-			log.Fatalf("❌ No input file specified and couldn't find latest results: %v", err)
+		log.Fatalf("[ERROR] No input file specified and couldn't find latest results: %v", err)
 		}
 		*inputFile = latest
-		fmt.Printf("📁 Using latest results: %s\n", *inputFile)
+		fmt.Printf("[INFO] Using latest results: %s\n", *inputFile)
 	}
 
 	if *outputDir == "" {
@@ -94,10 +94,10 @@ func main() {
 
 	generator, err := NewChartGenerator(*inputFile, *outputDir)
 	if err != nil {
-		log.Fatalf("❌ Failed to initialize chart generator: %v", err)
+		log.Fatalf("[ERROR] Failed to initialize chart generator: %v", err)
 	}
 
-	fmt.Println("🎨 Generating charts...")
+	fmt.Println("[INFO] Generating charts...")
 
 	switch *chartType {
 	case "throughput":
@@ -111,14 +111,14 @@ func main() {
 	case "all":
 		err = generator.GenerateAllCharts()
 	default:
-		log.Fatalf("❌ Unknown chart type: %s", *chartType)
+		log.Fatalf("[ERROR] Unknown chart type: %s", *chartType)
 	}
 
 	if err != nil {
-		log.Fatalf("❌ Failed to generate charts: %v", err)
+		log.Fatalf("[ERROR] Failed to generate charts: %v", err)
 	}
 
-	fmt.Println("✅ Charts generated successfully!")
+	fmt.Println("[SUCCESS] Charts generated successfully!")
 }
 
 func showUsage() {
@@ -206,7 +206,7 @@ func (cg *ChartGenerator) GenerateThroughputChart() error {
 	bar := charts.NewBar()
 	bar.SetGlobalOptions(
 		charts.WithTitleOpts(opts.Title{
-			Title:    "🚀 Throughput Comparison: NFS vs Direct Storage",
+			Title:    "Throughput Comparison: NFS vs Direct Storage",
 			Subtitle: "Operations per second - Higher is Better",
 		}),
 		charts.WithYAxisOpts(opts.YAxis{
@@ -234,7 +234,7 @@ func (cg *ChartGenerator) GenerateThroughputChart() error {
 	diff := ((directOps - nfsOps) / directOps) * 100
 	bar.SetGlobalOptions(
 		charts.WithTitleOpts(opts.Title{
-			Title:    "🚀 Throughput Comparison: NFS vs Direct Storage",
+			Title:    "Throughput Comparison: NFS vs Direct Storage",
 			Subtitle: fmt.Sprintf("Operations per second - NFS is %.1f%% slower", diff),
 		}),
 	)
@@ -251,7 +251,7 @@ func (cg *ChartGenerator) GenerateThroughputChart() error {
 		return err
 	}
 
-	fmt.Printf("📊 Throughput chart saved: %s\n", outputFile)
+	fmt.Printf("[INFO] Throughput chart saved: %s\n", outputFile)
 	return nil
 }
 
@@ -259,7 +259,7 @@ func (cg *ChartGenerator) GenerateLatencyChart() error {
 	bar := charts.NewBar()
 	bar.SetGlobalOptions(
 		charts.WithTitleOpts(opts.Title{
-			Title:    "⏱️ Latency Distribution: NFS vs Direct Storage",
+			Title:    "Latency Distribution: NFS vs Direct Storage",
 			Subtitle: "Response time in milliseconds - Lower is Better",
 		}),
 		charts.WithYAxisOpts(opts.YAxis{
@@ -327,7 +327,7 @@ func (cg *ChartGenerator) GenerateLatencyChart() error {
 		return err
 	}
 
-	fmt.Printf("⏱️ Latency chart saved: %s\n", outputFile)
+	fmt.Printf("[INFO] Latency chart saved: %s\n", outputFile)
 	return nil
 }
 
@@ -339,7 +339,7 @@ func (cg *ChartGenerator) GenerateCombinedChart() error {
 	throughputBar := charts.NewBar()
 	throughputBar.SetGlobalOptions(
 		charts.WithTitleOpts(opts.Title{
-			Title: "🚀 Throughput Comparison",
+			Title: "Throughput Comparison",
 		}),
 		charts.WithYAxisOpts(opts.YAxis{
 			Name: "Operations/sec",
@@ -359,7 +359,7 @@ func (cg *ChartGenerator) GenerateCombinedChart() error {
 	latencyBar := charts.NewBar()
 	latencyBar.SetGlobalOptions(
 		charts.WithTitleOpts(opts.Title{
-			Title: "⏱️ Key Latency Metrics",
+			Title: "Key Latency Metrics",
 		}),
 		charts.WithYAxisOpts(opts.YAxis{
 			Name: "Latency (ms)",
@@ -398,7 +398,7 @@ func (cg *ChartGenerator) GenerateCombinedChart() error {
 		return err
 	}
 
-	fmt.Printf("📊 Combined chart saved: %s\n", outputFile)
+	fmt.Printf("[INFO] Combined chart saved: %s\n", outputFile)
 	return nil
 }
 
@@ -437,7 +437,7 @@ func (cg *ChartGenerator) GenerateDashboard() error {
 		return err
 	}
 
-	fmt.Printf("📊 Dashboard saved: %s\n", outputFile)
+	fmt.Printf("[INFO] Dashboard saved: %s\n", outputFile)
 	return nil
 }
 

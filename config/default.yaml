@@ -4,7 +4,7 @@
 # Global settings
 global:
   output_dir: "./results"
-  timestamp_format: "%Y%m%d_%H%M%S"
+  timestamp_format: "20060102_150405"
   log_level: "INFO"
   max_workers: 4
 

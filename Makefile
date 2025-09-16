@@ -123,7 +123,12 @@ benchmark-dry-run: ## Show what benchmark would run without executing
 
 report: ## Generate reports from latest benchmark results
 	@echo "Generating reports from latest results..."
-	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner python -m src.benchmark report $(shell ls -t $(RESULTS_DIR) | head -1)
+	@latest_result=$$(find $(RESULTS_DIR) -name "*.json" -type f | sort -r | head -1); \
+	if [ -n "$$latest_result" ]; then \
+		./scripts/generate_report.sh "$$latest_result"; \
+	else \
+		echo "No benchmark results found. Run 'make benchmark' first."; \
+	fi
 
 report-all: ## Generate reports from all results
 	@echo "Generating reports for all results..."
@@ -132,8 +137,14 @@ report-all: ## Generate reports from all results
 		docker-compose -f $(COMPOSE_FILE) exec benchmark-runner python -m src.benchmark report $$dir; \
 	done
 
-report-html: ## Generate HTML reports only
-	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner python -m src.benchmark report $(shell ls -t $(RESULTS_DIR) | head -1) -f html
+report-html: ## Generate HTML reports from latest results
+	@echo "Generating HTML report from latest results..."
+	@latest_result=$$(find $(RESULTS_DIR) -name "*.json" -type f | sort -r | head -1); \
+	if [ -n "$$latest_result" ]; then \
+		./scripts/generate_report.sh -f html "$$latest_result"; \
+	else \
+		echo "No benchmark results found. Run 'make benchmark' first."; \
+	fi
 
 report-csv: ## Generate CSV reports only
 	@docker-compose -f $(COMPOSE_FILE) exec benchmark-runner python -m src.benchmark report $(shell ls -t $(RESULTS_DIR) | head -1) -f csv
