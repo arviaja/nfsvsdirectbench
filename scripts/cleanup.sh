@@ -28,6 +28,22 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Safety function to show all containers for transparency
+show_safety_info() {
+    print_status "Container safety check - All running Docker containers:"
+    docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" | head -10
+    echo ""
+    print_status "This cleanup will ONLY affect containers managed by this project's docker-compose.yml"
+    local nfsbench_containers=$(docker ps -q --filter "name=^/nfsbench-" 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$nfsbench_containers" -gt 0 ]; then
+        echo "Benchmark containers that will be stopped:"
+        docker ps --filter "name=^/nfsbench-" --format "  ✗ {{.Names}} ({{.Image}})"
+    else
+        echo "No benchmark containers currently running."
+    fi
+    echo ""
+}
+
 main() {
     print_status "Emergency cleanup of NFS benchmark services"
     echo ""
@@ -38,18 +54,40 @@ main() {
         exit 1
     fi
     
+    # Show safety information
+    show_safety_info
+    
     # Show current services
     print_status "Current benchmark services:"
     if docker-compose ps -q | grep -q .; then
         docker-compose ps
         echo ""
+        
+        # Show which specific containers will be affected
+        print_status "The following containers will be stopped:"
+        docker ps --filter "name=^/nfsbench-" --format "  - {{.Names}} ({{.Image}})"
+        echo ""
     else
         print_status "No benchmark services found running"
+        
+        # Double-check for any stray containers with our specific naming pattern
+        local stray_containers=$(docker ps -q --filter "name=^/nfsbench-" 2>/dev/null | wc -l | tr -d ' ')
+        if [ "$stray_containers" -gt 0 ]; then
+            print_warning "Found stray nfsbench containers not managed by docker-compose:"
+            docker ps --filter "name=^/nfsbench-" --format "  - {{.Names}} ({{.Image}})"
+            print_status "Cleaning up stray containers (only those starting with 'nfsbench-')..."
+            local stray_ids=$(docker ps -q --filter "name=^/nfsbench-" 2>/dev/null)
+            if [ -n "$stray_ids" ]; then
+                echo "$stray_ids" | xargs -r docker stop 2>/dev/null || true
+                echo "$stray_ids" | xargs -r docker rm 2>/dev/null || true
+            fi
+            print_success "Stray containers cleaned up"
+        fi
         exit 0
     fi
     
-    # Stop services
-    print_status "Stopping all benchmark services..."
+    # Stop services using docker-compose (safest method)
+    print_status "Stopping benchmark services using docker-compose..."
     docker-compose down --remove-orphans
     
     # Optional: Also remove volumes (uncomment if needed)

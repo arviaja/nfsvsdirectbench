@@ -65,9 +65,29 @@ EOF
 # Global variable to track the benchmark exit code
 BENCHMARK_EXIT_CODE=0
 
+# Safety function to show container status before cleanup
+show_container_safety_info() {
+    print_status "Container safety check:"
+    echo "All running Docker containers:"
+    docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" | head -10
+    echo ""
+    print_status "This cleanup will ONLY affect containers with names starting with 'nfsbench-'"
+    local nfsbench_containers=$(docker ps -q --filter "name=^/nfsbench-" 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$nfsbench_containers" -gt 0 ]; then
+        echo "Benchmark containers that will be affected:"
+        docker ps --filter "name=^/nfsbench-" --format "  ✗ {{.Names}} ({{.Image}})"
+    else
+        echo "No benchmark containers currently running."
+    fi
+    echo ""
+}
+
 # Function to cleanup services with timeout and verification
 cleanup_services() {
     print_status "Shutting down benchmark services..."
+    
+    # Show safety information about what containers exist and what will be affected
+    show_container_safety_info
     
     if docker-compose ps -q | grep -q .; then
         # Attempt graceful shutdown first
@@ -101,12 +121,23 @@ cleanup_services() {
             docker network rm nfsvsdirectbench_nfsbench-network 2>/dev/null || true
         fi
         
-        # Verify all containers are stopped
-        local remaining=$(docker ps -q --filter name=nfsbench | wc -l | tr -d ' ')
-        if [ "$remaining" -gt 0 ]; then
-            print_warning "Force stopping remaining containers..."
-            docker stop $(docker ps -q --filter name=nfsbench) 2>/dev/null || true
-            docker rm $(docker ps -aq --filter name=nfsbench) 2>/dev/null || true
+        # Verify only our specific benchmark containers are stopped
+        # Only target containers with our exact naming pattern: nfsbench-*
+        # Using a more specific pattern to match only our containers
+        local remaining_containers=$(docker ps -q --filter "name=^/nfsbench-" 2>/dev/null | wc -l | tr -d ' ')
+        if [ "$remaining_containers" -gt 0 ]; then
+            print_warning "Force stopping remaining benchmark containers..."
+            
+            # List the specific containers we're targeting for safety
+            print_status "Targeting these specific containers:"
+            docker ps --filter "name=^/nfsbench-" --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+            
+            # Only stop containers that match our exact naming pattern (prevent any possibility of collateral damage)
+            local container_ids=$(docker ps -q --filter "name=^/nfsbench-" 2>/dev/null)
+            if [ -n "$container_ids" ]; then
+                echo "$container_ids" | xargs -r docker stop 2>/dev/null || true
+                echo "$container_ids" | xargs -r docker rm 2>/dev/null || true
+            fi
         fi
         
         print_success "All benchmark services stopped"
